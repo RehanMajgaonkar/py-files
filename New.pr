@@ -1,0 +1,49 @@
+import pandas as pd
+import numpy as np
+
+def is_first_working_day(current_date):
+    # Placeholder for the function that checks if it's the first working day of the month
+    pass
+
+def Concat_Compare(workstation_file, workstation_final, current_date):
+    # Read the data
+    workstation_df = pd.read_excel(workstation_file, sheet_name="Master 2")
+
+    # Add "Concat" and "Compare" columns before "Vul"
+    vul_index = workstation_df.columns.get_loc("Vul")
+    workstation_df.insert(vul_index, "Concat", "")
+    workstation_df.insert(vul_index + 1, "Compare", "")
+
+    # Populate the "Concat" column
+    workstation_df['Concat'] = workstation_df.iloc[:, :8].apply(lambda row: ''.join(row.astype(str)), axis=1)
+
+    if not is_first_working_day(current_date):
+        # Read the final baseline data
+        workstation_final_df = pd.read_excel(workstation_final, sheet_name="Master 2")
+
+        # Populate the "Compare" column with VLOOKUP logic
+        workstation_df['Compare'] = workstation_df['Concat'].apply(
+            lambda x: workstation_final_df.loc[workstation_final_df['Concat'] == x, 'Concat'].values[0] if not workstation_final_df.loc[workstation_final_df['Concat'] == x].empty else np.nan
+        )
+
+        # Filter out the rows with "Compare" as NaN and mark them as "New"
+        new_df = workstation_df[workstation_df['Compare'].isna()].copy()
+        new_df['Compare'] = "New"
+        
+        # Remove the new rows from the original dataframe
+        workstation_df = workstation_df.dropna(subset=['Compare'])
+
+        # Write the updated dataframes to the Excel file
+        with pd.ExcelWriter(workstation_file, mode='a', if_sheet_exists='replace') as writer:
+            workstation_df.to_excel(writer, sheet_name="Master 2", index=False)
+            new_df.to_excel(writer, sheet_name="New", index=False)
+        print("Concat and Compare columns are created, and new entries are moved to the 'New' sheet")
+
+    else:
+        # Write the dataframe with "Concat" and "Compare" columns but without comparison
+        with pd.ExcelWriter(workstation_file, mode='a', if_sheet_exists='replace') as writer:
+            workstation_df.to_excel(writer, sheet_name="Master 2", index=False)
+        print("Concat and Compare columns are created")
+
+# Example usage
+# Concat_Compare('path_to_workstation_file.xlsx', 'path_to_workstation_final.xlsx', '2023-06-20')
